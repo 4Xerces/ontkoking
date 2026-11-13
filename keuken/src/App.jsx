@@ -2,6 +2,13 @@ import { useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Model } from './model';
 import { Bounds } from '@react-three/drei';
+import {
+  ChromaticAberration,
+  EffectComposer,
+  Noise,
+  Pixelation,
+  Vignette,
+} from '@react-three/postprocessing';
 
 const CAMERA_POSITION = [5, 12, 0];
 const CAMERA_TARGET = [-10, 8, 0];
@@ -67,14 +74,33 @@ function App() {
       }}
     >
       <Canvas camera={{ fov: 60, near: 0.1, far: 500, position: CAMERA_POSITION }}>
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[8, 5, 10]} intensity={1.5} />
+        <color attach="background" args={['#0c1020']} />
+        <fog attach="fog" args={['#111522', 32, 90]} />
+        <ambientLight color="#8492b8" intensity={0.7} />
+        <directionalLight
+          color="#b9c9ff"
+          position={[8, 15, 10]}
+          intensity={1.8}
+        />
+        <pointLight
+          color="#ff704a"
+          position={[-14, 10, 4]}
+          intensity={25}
+          distance={40}
+          decay={2}
+        />
 
         <Bounds>
           <Model />
         </Bounds>
 
         <CursorCamera pointer={pointer} />
+        <EffectComposer multisampling={0}>
+          <Pixelation granularity={2} />
+          <Noise opacity={0.008} />
+          <ChromaticAberration offset={[0.0004, 0.0004]} />
+          <Vignette eskil={false} offset={0.18} darkness={0.45} />
+        </EffectComposer>
       </Canvas>
     </div>
   );
