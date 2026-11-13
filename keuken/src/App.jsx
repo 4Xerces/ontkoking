@@ -23,7 +23,7 @@ function App() {
         fov: 60,              // Field of View
         near: 0.1,            // Near clipping plane
         far: 500,            // Far clipping plane
-        position: [15, 8, 2]   // [X, Y, Z] starting position
+        position: [5, 12, 0]   // [X, Y, Z] starting position
       }}
     >
       
@@ -34,7 +34,7 @@ function App() {
            <Model />
         </Bounds>
 
-        <OrbitControls enableZoom={false} target={[0, 4, 0]} />
+        <OrbitControls enableZoom={false} target={[-10, 8, 0]} />
        
       </Canvas>
     </div>
