@@ -1,5 +1,32 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Edges, useGLTF } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
+
+function PulsingEdges() {
+  const edge = useRef(null)
+
+  useFrame(({ clock }) => {
+    const pulse = (Math.sin(clock.elapsedTime * 5) + 1) / 2
+    const material = edge.current?.material
+
+    if (material) {
+      material.linewidth = 1.5 + pulse * 4
+      material.opacity = 0.2 + pulse * 0.8
+      material.color.setRGB(1, 0.4 + pulse * 0.5, 0.05 + pulse * 0.35)
+    }
+  })
+
+  return (
+    <Edges
+      ref={edge}
+      color="#ff9f0a"
+      lineWidth={1.5}
+      opacity={1}
+      transparent
+      threshold={30}
+    />
+  )
+}
 
 export function Model(props) {
   const { nodes, materials } = useGLTF('/kitchennote&board.glb')
@@ -96,7 +123,7 @@ export function Model(props) {
             geometry={nodes.Cube003_2.geometry}
             material={materials.board}
           >
-            {boardHovered && <Edges color="#ffdf4d" lineWidth={2} threshold={30} />}
+            {boardHovered && <PulsingEdges />}
           </mesh>
           <mesh
             castShadow
@@ -104,7 +131,7 @@ export function Model(props) {
             geometry={nodes.Cube003_3.geometry}
             material={materials.reviewboard}
           >
-            {boardHovered && <Edges color="#ffdf4d" lineWidth={2} threshold={30} />}
+            {boardHovered && <PulsingEdges />}
           </mesh>
         </group>
       </group>
@@ -133,7 +160,7 @@ export function Model(props) {
           setBookHovered(false)
         }}
       >
-        {bookHovered && <Edges color="#ffdf4d" lineWidth={2} threshold={30} />}
+        {bookHovered && <PulsingEdges />}
       </mesh>
       <mesh
         castShadow
@@ -151,7 +178,7 @@ export function Model(props) {
           setNotepadHovered(false)
         }}
       >
-        {notepadHovered && <Edges color="#ffdf4d" lineWidth={2} threshold={30} />}
+        {notepadHovered && <PulsingEdges />}
       </mesh>
     </group>
   )
