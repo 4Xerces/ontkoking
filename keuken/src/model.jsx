@@ -28,7 +28,7 @@ function PulsingEdges() {
   )
 }
 
-export function Model(props) {
+export function Model({ onBookClick, ...props }) {
   const { nodes, materials } = useGLTF('/kitchennote&board.glb')
   const [bookHovered, setBookHovered] = useState(false)
   const [notepadHovered, setNotepadHovered] = useState(false)
@@ -158,6 +158,10 @@ export function Model(props) {
         onPointerOut={(event) => {
           event.stopPropagation()
           setBookHovered(false)
+        }}
+        onClick={(event) => {
+          event.stopPropagation()
+          onBookClick?.()
         }}
       >
         {bookHovered && <PulsingEdges />}
