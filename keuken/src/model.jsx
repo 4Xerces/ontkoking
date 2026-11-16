@@ -29,7 +29,7 @@ function PulsingEdges() {
 }
 
 export function Model({ onBookClick, ...props }) {
-  const { nodes, materials } = useGLTF('/kitchennote&board.glb')
+  const { nodes, materials } = useGLTF('/sinkfulllkitchenfinal.glb')
   const [bookHovered, setBookHovered] = useState(false)
   const [notepadHovered, setNotepadHovered] = useState(false)
   const [boardHovered, setBoardHovered] = useState(false)
@@ -92,6 +92,12 @@ export function Model({ onBookClick, ...props }) {
           receiveShadow
           geometry={nodes.Cube002_5.geometry}
           material={materials.oven}
+        />
+        <mesh
+          castShadow
+          receiveShadow
+          geometry={nodes.Cube002_6.geometry}
+          material={materials.sink}
         />
       </group>
       <group position={[64.682, 0, 0]}>
@@ -188,4 +194,4 @@ export function Model({ onBookClick, ...props }) {
   )
 }
 
-useGLTF.preload('/kitchennote&board.glb')
+useGLTF.preload('/sinkfulllkitchenfinal.glb')
