@@ -28,6 +28,22 @@ function e($value)
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
+function startAppSession()
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return;
+    }
+
+    ini_set('session.use_strict_mode', '1');
+    session_set_cookie_params(array(
+        'httponly' => true,
+        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'samesite' => 'Lax',
+        'path' => '/',
+    ));
+    session_start();
+}
+
 function recipeDb()
 {
     static $db = null;
@@ -47,6 +63,15 @@ function recipeDb()
     $db->exec('PRAGMA foreign_keys = ON');
     $db->exec('PRAGMA busy_timeout = 5000');
     $db->exec(
+        'CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT \'user\' CHECK (role IN (\'user\', \'admin\')),
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )'
+    );
+    $db->exec(
         'CREATE TABLE IF NOT EXISTS recipes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -59,15 +84,110 @@ function recipeDb()
             image TEXT NOT NULL DEFAULT \'\',
             ingredients TEXT NOT NULL DEFAULT \'\',
             instructions TEXT NOT NULL DEFAULT \'\',
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )'
     );
+
+    $columns = $db->query('PRAGMA table_info(recipes)')->fetchAll(PDO::FETCH_COLUMN, 1);
+    if (!in_array('user_id', $columns, true)) {
+        $db->exec('ALTER TABLE recipes ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
+    }
+
     $db->exec('CREATE INDEX IF NOT EXISTS recipes_category_idx ON recipes(category)');
+    $db->exec('CREATE INDEX IF NOT EXISTS recipes_user_id_idx ON recipes(user_id)');
 
     translateSampleRecipes($db);
     seedRecipes($db);
+    provisionAdminAccount($db);
 
     return $db;
+}
+
+function provisionAdminAccount(PDO $db)
+{
+    $password = getenv('ADMIN_PASSWORD');
+    if ($password === false || $password === '') {
+        return;
+    }
+    if (strlen($password) < 12 || strlen($password) > 72) {
+        throw new RuntimeException('ADMIN_PASSWORD must be between 12 and 72 bytes.');
+    }
+
+    $query = $db->prepare('SELECT id, role FROM users WHERE username = :username');
+    $query->execute(array(':username' => 'alexcaspercrud'));
+    $existingAdmin = $query->fetch();
+
+    if (!$existingAdmin) {
+        $insert = $db->prepare(
+            'INSERT INTO users (username, password_hash, role)
+             VALUES (:username, :password_hash, \'admin\')'
+        );
+        $insert->execute(array(
+            ':username' => 'alexcaspercrud',
+            ':password_hash' => password_hash($password, PASSWORD_DEFAULT),
+        ));
+        $adminId = $db->lastInsertId();
+    } elseif ($existingAdmin['role'] !== 'admin') {
+        throw new RuntimeException('The reserved administrator username is already registered.');
+    } else {
+        $adminId = $existingAdmin['id'];
+    }
+
+    $assignRecipes = $db->prepare('UPDATE recipes SET user_id = :user_id WHERE user_id IS NULL');
+    $assignRecipes->execute(array(':user_id' => $adminId));
+}
+
+function currentUser(PDO $db)
+{
+    startAppSession();
+    if (!isset($_SESSION['user_id']) || !is_int($_SESSION['user_id'])) {
+        return null;
+    }
+
+    $query = $db->prepare('SELECT id, username, role FROM users WHERE id = :id');
+    $query->execute(array(':id' => $_SESSION['user_id']));
+    $user = $query->fetch();
+    if (!$user) {
+        unset($_SESSION['user_id']);
+        return null;
+    }
+
+    return $user;
+}
+
+function requireLogin(PDO $db)
+{
+    if (!currentUser($db)) {
+        header('Location: /src/login.php', true, 303);
+        exit;
+    }
+}
+
+function csrfToken()
+{
+    startAppSession();
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return $_SESSION['csrf_token'];
+}
+
+function validCsrfToken()
+{
+    startAppSession();
+    $submitted = isset($_POST['csrf_token']) && is_string($_POST['csrf_token'])
+        ? $_POST['csrf_token']
+        : '';
+
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $submitted);
+}
+
+function canManageRecipe($user, $recipe)
+{
+    return $user && ($user['role'] === 'admin'
+        || (int)$recipe['user_id'] === (int)$user['id']);
 }
 
 function translateSampleRecipes(PDO $db)
@@ -164,7 +284,12 @@ function recipeCounts(PDO $db)
     return $counts;
 }
 
-function pageUrl($category, $page)
+function pageUrl($category, $page, $search = '')
 {
-    return 'recipes.php?' . http_build_query(array('category' => $category, 'page' => $page));
+    $parameters = array('category' => $category, 'page' => $page);
+    if ($search !== '') {
+        $parameters['search'] = $search;
+    }
+
+    return 'recipes.php?' . http_build_query($parameters);
 }

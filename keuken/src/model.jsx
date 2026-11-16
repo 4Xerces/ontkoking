@@ -28,7 +28,7 @@ function PulsingEdges() {
   )
 }
 
-export function Model({ onBookClick, ...props }) {
+export function Model({ onBookClick, onNotepadClick, ...props }) {
   const { nodes, materials } = useGLTF('/sinkfulllkitchenfinal.glb')
   const [bookHovered, setBookHovered] = useState(false)
   const [notepadHovered, setNotepadHovered] = useState(false)
@@ -186,6 +186,10 @@ export function Model({ onBookClick, ...props }) {
         onPointerOut={(event) => {
           event.stopPropagation()
           setNotepadHovered(false)
+        }}
+        onClick={(event) => {
+          event.stopPropagation()
+          onNotepadClick?.()
         }}
       >
         {notepadHovered && <PulsingEdges />}

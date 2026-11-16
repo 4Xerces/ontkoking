@@ -14,6 +14,8 @@
 
         <?php if (isset($_GET['created']) && $_GET['created'] === '1'): ?>
           <p class="success-message" role="status">Je recept is toegevoegd aan het receptenboek.</p>
+        <?php elseif (isset($_GET['updated']) && $_GET['updated'] === '1'): ?>
+          <p class="success-message" role="status">Je wijzigingen zijn opgeslagen.</p>
         <?php endif; ?>
 
         <article class="recipe-detail">
@@ -23,6 +25,7 @@
             <?php endif; ?>
             <h1><?= e($recipe['title']) ?></h1>
             <p class="desc"><?= e($recipe['description']) ?></p>
+            <p class="recipe-author">Door <?= e($recipe['author'] ?: 'onbekend') ?></p>
             <dl class="facts detail-facts">
               <div><dt>Voorbereiding</dt><dd><?= (int)$recipe['prep_time'] ?> min</dd></div>
               <div><dt>Bereiding</dt><dd><?= (int)$recipe['cook_time'] ?> min</dd></div>
@@ -31,6 +34,18 @@
               <div><dt>Porties</dt><dd><?= (int)$recipe['servings'] ?></dd></div>
             </dl>
           </div>
+
+          <?php if (canManageRecipe($currentUser, $recipe)): ?>
+            <div class="manage-actions">
+              <a class="manage-link" href="add_recipe.php?id=<?= (int)$recipe['id'] ?>">Recept bewerken</a>
+              <form method="post" action="recipe_delete.php"
+                    onsubmit="return confirm('Weet je zeker dat je dit recept wilt verwijderen?')">
+                <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+                <input type="hidden" name="id" value="<?= (int)$recipe['id'] ?>">
+                <button class="delete-button" type="submit">Recept verwijderen</button>
+              </form>
+            </div>
+          <?php endif; ?>
 
           <?php if ($recipe['ingredients'] === '' && $recipe['instructions'] === ''): ?>
             <p class="sample-note">Aan dit voorbeeldrecept zijn nog geen ingrediënten of bereidingsstappen toegevoegd.</p>

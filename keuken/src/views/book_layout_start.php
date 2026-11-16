@@ -2,6 +2,7 @@
 $documentTitle = isset($documentTitle) ? $documentTitle : $bookTitle;
 $activeCategory = isset($activeCategory) ? $activeCategory : null;
 $activePage = isset($activePage) ? $activePage : '';
+$currentUser = isset($currentUser) ? $currentUser : currentUser($db);
 ?>
 <!DOCTYPE html>
 <html lang="nl">
@@ -22,10 +23,25 @@ $activePage = isset($activePage) ? $activePage : '';
       <header class="intro">
         <h1 class="title"><a class="title-link" href="recipes.php"><?= e($bookTitle) ?></a></h1>
         <p class="note"><?= e($bookNote) ?></p>
+        <a class="home-link" href="/">Terug naar de keuken</a>
+        <form class="logout-form" method="post" action="logout.php">
+          <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+          <button type="submit">Uitloggen</button>
+        </form>
       </header>
 
       <nav class="contents" aria-label="Receptcategorieën">
         <h2>Inhoud</h2>
+        <form class="recipe-search" method="get" action="recipes.php">
+          <label for="recipe-search">Zoek op receptnaam</label>
+          <div class="recipe-search-controls">
+            <input id="recipe-search" type="search" name="search" value="<?= e(isset($search) ? $search : '') ?>"
+                   placeholder="Bijv. nestle koffie">
+            <input type="hidden" name="category"
+                   value="<?= e(isset($activeCategory) && isset($categories[$activeCategory]) ? $activeCategory : 'all') ?>">
+            <button type="submit">Zoek</button>
+          </div>
+        </form>
         <ul>
           <?php foreach ($categories as $key => $label): ?>
             <li>

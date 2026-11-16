@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Model } from './model';
 import { Bounds } from '@react-three/drei';
@@ -15,11 +15,14 @@ const CAMERA_POSITION = [5, 12, 0];
 const CAMERA_TARGET = [-10, 8, 0];
 const BOOK_POSITION = [-11.752, 4.82, 4.749];
 const BOOK_CAMERA_POSITION = [-10.7, 11.41, 4.749];
+const NOTEBOOK_POSITION = [-15.313, 6.04, -18.104];
+const NOTEBOOK_CAMERA_POSITION = [-14.7, 8.5, -17.2];
 // peep 100 - 130 ivm 4de muur POTENTIALLY THO
 const CAMERA_TURN_RANGE = (100 * Math.PI) / 180;
 const CAMERA_TILT_RANGE = 0.25;
 const CAMERA_SMOOTHING = 6;
 const BOOK_FOCUS_DURATION = 1.2;
+const NOTEBOOK_FOCUS_DURATION = 1.4;
 
 function CursorCamera({ pointer, focus, onFocusComplete }) {
   const { camera } = useThree();
@@ -29,32 +32,35 @@ function CursorCamera({ pointer, focus, onFocusComplete }) {
   const initialPhi = Math.acos(offset[1] / radius);
   const angles = useRef({ theta: initialTheta, phi: initialPhi });
   const initialTarget = useRef(new Vector3(...CAMERA_TARGET));
-  const focusTarget = useRef(new Vector3(...BOOK_POSITION));
   const cameraTarget = useRef(new Vector3());
-  const focusPosition = useRef(new Vector3(...BOOK_CAMERA_POSITION));
   const cameraFocus = useRef(null);
 
   useFrame((_, delta) => {
     if (focus.current) {
       if (!cameraFocus.current) {
+        const isNotebook = focus.current === 'notebook';
         cameraFocus.current = {
           elapsed: 0,
+          duration: isNotebook ? NOTEBOOK_FOCUS_DURATION : BOOK_FOCUS_DURATION,
           fromPosition: camera.position.clone(),
+          toPosition: new Vector3(...(isNotebook ? NOTEBOOK_CAMERA_POSITION : BOOK_CAMERA_POSITION)),
+          fromTarget: initialTarget.current.clone(),
+          toTarget: new Vector3(...(isNotebook ? NOTEBOOK_POSITION : BOOK_POSITION)),
         };
       }
       const currentFocus = cameraFocus.current;
 
       currentFocus.elapsed += delta;
-      const progress = Math.min(currentFocus.elapsed / BOOK_FOCUS_DURATION, 1);
+      const progress = Math.min(currentFocus.elapsed / currentFocus.duration, 1);
       const easedProgress = progress * progress * (3 - 2 * progress);
       camera.position.lerpVectors(
         currentFocus.fromPosition,
-        focusPosition.current,
+        currentFocus.toPosition,
         easedProgress,
       );
       cameraTarget.current.lerpVectors(
-        initialTarget.current,
-        focusTarget.current,
+        currentFocus.fromTarget,
+        currentFocus.toTarget,
         easedProgress,
       );
       camera.lookAt(cameraTarget.current);
@@ -105,13 +111,17 @@ function KitchenScene() {
   }
 
   function focusBook() {
-    focus.current = true;
+    focus.current = 'book';
+  }
+
+  function focusNotebook() {
+    focus.current = 'notebook';
   }
 
   function navigateToRecipes() {
     navigationTimer.current = window.setTimeout(() => {
-      window.location.assign('/src/recipes.php');
-    }, 700);
+      window.location.assign(focus.current === 'notebook' ? '/src/profile.php' : '/src/recipes.php');
+    }, 800);
   }
 
   return (
@@ -128,7 +138,16 @@ function KitchenScene() {
         zIndex: 1,
       }}
     >
-      <Canvas camera={{ fov: 60, near: 0.1, far: 500, position: CAMERA_POSITION }}>
+      <Canvas
+        camera={{ fov: 60, near: 0.1, far: 500, position: CAMERA_POSITION }}
+        fallback={
+          <main className="scene-fallback">
+            <h1>De 3D-keuken is niet beschikbaar</h1>
+            <p>Schakel WebGL of hardwareversnelling in, of open het receptenboek rechtstreeks.</p>
+            <a href="/src/recipes.php">Open het receptenboek</a>
+          </main>
+        }
+      >
         <color attach="background" args={['#0c1020']} />
         <fog attach="fog" args={['#111522', 32, 90]} />
         <ambientLight color="#8492b8" intensity={0.7} />
@@ -146,7 +165,10 @@ function KitchenScene() {
         />
 
         <Bounds>
-          <Model onBookClick={focusBook} />
+          <Model
+            onBookClick={focusBook}
+            onNotepadClick={focusNotebook}
+          />
         </Bounds>
 
         <CursorCamera
@@ -166,7 +188,42 @@ function KitchenScene() {
 }
 
 function App() {
-  return <KitchenScene />;
+  const [access, setAccess] = useState('checking');
+
+  useEffect(() => {
+    let active = true;
+    fetch('/src/session.php', { credentials: 'same-origin', cache: 'no-store' })
+      .then((response) => {
+        if (!response.ok) throw new Error('Could not verify your login.')
+        return response.json()
+      })
+      .then(({ authenticated }) => {
+        if (!active) return
+        if (authenticated) {
+          setAccess('allowed')
+        } else {
+          window.location.replace('/src/login.php')
+        }
+      })
+      .catch(() => {
+        if (active) setAccess('error')
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  if (access === 'allowed') return <KitchenScene />
+  if (access === 'error') {
+    return (
+      <main className="access-message">
+        <p>Kan je login niet controleren. Controleer of de PHP-server actief is.</p>
+        <button type="button" onClick={() => window.location.reload()}>Opnieuw proberen</button>
+      </main>
+    )
+  }
+  return <main className="access-message" aria-live="polite">Keuken wordt geopend…</main>
 }
 
 export default App

@@ -1,7 +1,7 @@
 <?php require __DIR__ . DIRECTORY_SEPARATOR . 'book_layout_start.php'; ?>
       <header class="page-head">
-        <h2>Recept toevoegen</h2>
-        <p>Een nieuwe recept in je boek</p>
+        <h2><?= $editingRecipe ? 'Recept bewerken' : 'Recept toevoegen' ?></h2>
+        <p><?= $editingRecipe ? 'Pas deze bladzijde aan' : 'Een nieuwe bladzijde in je boek' ?></p>
       </header>
 
       <?php if ($errors): ?>
@@ -15,7 +15,8 @@
         </div>
       <?php endif; ?>
 
-      <form class="recipe-form" method="post" action="add_recipe.php">
+      <form class="recipe-form" method="post"
+            action="add_recipe.php<?= $editingRecipe ? '?id=' . (int)$editingId : '' ?>">
         <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
 
         <label class="field field--wide">
@@ -76,8 +77,8 @@
         </label>
 
         <div class="form-actions field--wide">
-          <a class="back-link" href="recipes.php">Terug naar het receptenboek</a>
-          <button class="button" type="submit">Recept opslaan</button>
+          <a class="back-link" href="<?= $editingRecipe ? 'recipe.php?id=' . (int)$editingId : 'recipes.php' ?>">Terug naar het receptenboek</a>
+          <button class="button" type="submit"><?= $editingRecipe ? 'Wijzigingen opslaan' : 'Recept opslaan' ?></button>
         </div>
       </form>
 <?php require __DIR__ . DIRECTORY_SEPARATOR . 'book_layout_end.php'; ?>

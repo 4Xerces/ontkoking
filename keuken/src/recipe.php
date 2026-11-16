@@ -6,12 +6,18 @@ $bookTitle = 'Het Receptenboek';
 $bookNote = 'Sla de bladzijden om en ontdek iets lekkers om te maken.';
 $categories = recipeCategories();
 $db = recipeDb();
+$currentUser = currentUser($db);
+requireLogin($db);
 $counts = recipeCounts($db);
 $id = isset($_GET['id']) && is_scalar($_GET['id']) ? filter_var($_GET['id'], FILTER_VALIDATE_INT) : false;
 $recipe = false;
 
 if ($id !== false && $id > 0) {
-    $query = $db->prepare('SELECT * FROM recipes WHERE id = :id');
+    $query = $db->prepare(
+        'SELECT recipes.*, users.username AS author
+         FROM recipes LEFT JOIN users ON users.id = recipes.user_id
+         WHERE recipes.id = :id'
+    );
     $query->execute(array(':id' => $id));
     $recipe = $query->fetch();
 }

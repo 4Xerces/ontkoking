@@ -1,15 +1,33 @@
 <?php
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'recipe_data.php';
-session_start();
 
-$bookTitle = 'Het Receptenboek';
-$bookNote = 'Voeg een bladzijde toe en bewaar je favoriete recept.';
-$categories = recipeCategories();
 $db = recipeDb();
+$currentUser = currentUser($db);
+requireLogin($db);
+$bookTitle = 'Het Receptenboek';
+$bookNote = 'Bewaar een nieuw recept in het receptenboek.';
+$categories = recipeCategories();
 $counts = recipeCounts($db);
-$activePage = 'add';
-$documentTitle = 'Recept toevoegen';
+$editingId = isset($_GET['id']) && is_scalar($_GET['id'])
+    ? filter_var($_GET['id'], FILTER_VALIDATE_INT)
+    : false;
+$editingRecipe = false;
+if ($editingId !== false) {
+    $query = $db->prepare('SELECT * FROM recipes WHERE id = :id');
+    $query->execute(array(':id' => $editingId));
+    $editingRecipe = $query->fetch();
+    if (!$editingRecipe) {
+        http_response_code(404);
+        exit('Recipe not found.');
+    }
+    if (!canManageRecipe($currentUser, $editingRecipe)) {
+        http_response_code(403);
+        exit('You cannot edit this recipe.');
+    }
+}
+$activePage = $editingRecipe ? '' : 'add';
+$documentTitle = $editingRecipe ? 'Recept bewerken' : 'Recept toevoegen';
 $errors = array();
 $values = array(
     'title' => '',
@@ -23,11 +41,12 @@ $values = array(
     'ingredients' => '',
     'instructions' => '',
 );
-
-if (empty($_SESSION['recipe_csrf_token'])) {
-    $_SESSION['recipe_csrf_token'] = bin2hex(random_bytes(32));
+if ($editingRecipe) {
+    foreach ($values as $key => $default) {
+        $values[$key] = (string)$editingRecipe[$key];
+    }
 }
-$csrfToken = $_SESSION['recipe_csrf_token'];
+$csrfToken = csrfToken();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($values as $key => $default) {
@@ -36,10 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $submittedToken = isset($_POST['csrf_token']) && is_string($_POST['csrf_token'])
-        ? $_POST['csrf_token']
-        : '';
-    if (!hash_equals($csrfToken, $submittedToken)) {
+    if (!validCsrfToken()) {
         $errors[] = 'Je formulier is verlopen. Verstuur het formulier opnieuw.';
     }
 
@@ -84,26 +100,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (!$errors) {
-        $insert = $db->prepare(
-            'INSERT INTO recipes
-                (title, category, description, prep_time, cook_time, difficulty, servings, image, ingredients, instructions)
-             VALUES
-                (:title, :category, :description, :prep_time, :cook_time, :difficulty, :servings, :image, :ingredients, :instructions)'
-        );
-        $insert->execute(array(
-            ':title' => $values['title'],
-            ':category' => $values['category'],
-            ':description' => $values['description'],
-            ':prep_time' => (int)$values['prep_time'],
-            ':cook_time' => (int)$values['cook_time'],
-            ':difficulty' => $values['difficulty'],
-            ':servings' => (int)$values['servings'],
-            ':image' => $values['image'],
-            ':ingredients' => $values['ingredients'],
-            ':instructions' => $values['instructions'],
-        ));
+        if ($editingRecipe) {
+            $save = $db->prepare(
+                'UPDATE recipes SET
+                    title = :title, category = :category, description = :description,
+                    prep_time = :prep_time, cook_time = :cook_time, difficulty = :difficulty,
+                    servings = :servings, image = :image, ingredients = :ingredients,
+                    instructions = :instructions
+                 WHERE id = :id'
+            );
+            $save->execute(array(
+                ':title' => $values['title'],
+                ':category' => $values['category'],
+                ':description' => $values['description'],
+                ':prep_time' => (int)$values['prep_time'],
+                ':cook_time' => (int)$values['cook_time'],
+                ':difficulty' => $values['difficulty'],
+                ':servings' => (int)$values['servings'],
+                ':image' => $values['image'],
+                ':ingredients' => $values['ingredients'],
+                ':instructions' => $values['instructions'],
+                ':id' => $editingId,
+            ));
+            $savedId = $editingId;
+        } else {
+            $save = $db->prepare(
+                'INSERT INTO recipes
+                (title, category, description, prep_time, cook_time, difficulty, servings,
+                 image, ingredients, instructions, user_id)
+                 VALUES
+                    (:title, :category, :description, :prep_time, :cook_time, :difficulty,
+                     :servings, :image, :ingredients, :instructions, :user_id)'
+            );
+            $save->execute(array(
+                ':title' => $values['title'],
+                ':category' => $values['category'],
+                ':description' => $values['description'],
+                ':prep_time' => (int)$values['prep_time'],
+                ':cook_time' => (int)$values['cook_time'],
+                ':difficulty' => $values['difficulty'],
+                ':servings' => (int)$values['servings'],
+                ':image' => $values['image'],
+                ':ingredients' => $values['ingredients'],
+                ':instructions' => $values['instructions'],
+                ':user_id' => (int)$currentUser['id'],
+            ));
+            $savedId = (int)$db->lastInsertId();
+        }
 
-        header('Location: recipe.php?id=' . (int)$db->lastInsertId() . '&created=1', true, 303);
+        header('Location: recipe.php?id=' . $savedId . ($editingRecipe ? '&updated=1' : '&created=1'), true, 303);
         exit;
     }
 }
