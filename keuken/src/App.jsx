@@ -10,7 +10,6 @@ import {
   Pixelation,
   Vignette,
 } from '@react-three/postprocessing';
-import Recipes from './Recipes';
 
 const CAMERA_POSITION = [5, 12, 0];
 const CAMERA_TARGET = [-10, 8, 0];
@@ -111,7 +110,7 @@ function KitchenScene() {
 
   function navigateToRecipes() {
     navigationTimer.current = window.setTimeout(() => {
-      window.location.assign('/recipes');
+      window.location.assign('/src/recipes.php');
     }, 700);
   }
 
@@ -167,8 +166,7 @@ function KitchenScene() {
 }
 
 function App() {
-  const isRecipesPage = window.location.pathname.replace(/\/+$/, '') === '/recipes';
-  return isRecipesPage ? <Recipes /> : <KitchenScene />;
+  return <KitchenScene />;
 }
 
 export default App
