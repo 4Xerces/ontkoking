@@ -58,7 +58,7 @@ $documentTitle = 'Recentiebord';
             <input type="hidden" name="recipe_id" value="<?= $recipeId ?>">
             <fieldset class="star-picker">
               <legend>Hoeveel sterren geef je het?</legend>
-              <?php for ($star = 1; $star <= 5; $star++): ?>
+              <?php for ($star = 5; $star >= 1; $star--): ?>
                 <label class="star-choice">
                   <input type="radio" name="rating" value="<?= $star ?>"
                          aria-label="<?= $star ?> <?= $star === 1 ? 'ster' : 'sterren' ?>"
